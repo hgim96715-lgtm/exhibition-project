@@ -1,0 +1,105 @@
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    container_name: exhibition-postgres
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - exhibition-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Airflow ─────────────────────────────────────────────
+  airflow:
+    image: apache/airflow:2.9.1
+    container_name: exhibition-airflow
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CORE__FERNET_KEY: ''
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+      # DB 연결 (DAG에서 사용)
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./crawl:/opt/airflow/crawl # 크롤러 스크립트
+      - ./load:/opt/airflow/load # PostgreSQL 적재 스크립트
+      - ./dbt_exhibition:/opt/airflow/dbt # dbt 프로젝트
+    ports:
+      - "8085:8080"
+    networks:
+      - exhibition-network
+    command: >
+      bash -c "
+        pip install requests beautifulsoup4 lxml psycopg2-binary dbt-postgres python-dotenv &&
+        airflow db migrate &&
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com || true &&
+        airflow scheduler &
+        airflow webserver
+      "
+
+  # ── Superset ─────────────────────────────────────────────
+  superset:
+    image: apache/superset:3.1.0
+    container_name: exhibition-superset
+    ports:
+      - "8090:8088"
+    environment:
+      - SUPERSET_SECRET_KEY=${SUPERSET_SECRET_KEY}
+    volumes:
+      - superset_data:/app/superset_home
+    networks:
+      - exhibition-network
+    depends_on:
+      - postgres
+
+  dbt:
+    build: .
+    ports:
+      - "8585:8585"
+    container_name: exhibition-dbt
+    working_dir: /dbt_exhibition
+    volumes:
+      - ./dbt_exhibition:/dbt_exhibition
+    networks:
+      - exhibition-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: tail -f /dev/null # dbt 컨테이너가 계속 실행되도록 유지!!
+
+volumes:
+  postgres_data:
+  superset_data:
+
+
+networks:
+  exhibition-network:
+    driver: bridge
