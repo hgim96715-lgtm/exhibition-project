@@ -45,7 +45,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./crawl:/opt/airflow/crawl # 크롤러 스크립트
       - ./load:/opt/airflow/load # PostgreSQL 적재 스크립트
-      - ./dbt_exhibition:/opt/airflow/dbt # dbt 프로젝트
+      - ./dbt:/opt/airflow/dbt # dbt 프로젝트
     ports:
       - "8085:8080"
     networks:
@@ -82,12 +82,14 @@ services:
 
   dbt:
     build: .
+    env_file:
+      - .env
     ports:
       - "8585:8585"
     container_name: exhibition-dbt
-    working_dir: /dbt_exhibition
+    working_dir: /dbt
     volumes:
-      - ./dbt_exhibition:/dbt_exhibition
+      - ./dbt:/dbt
     networks:
       - exhibition-network
     depends_on:
