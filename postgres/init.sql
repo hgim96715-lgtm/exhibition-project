@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS raw_exhibitions (
     id SERIAL PRIMARY KEY,
     exhibition_id VARCHAR(50) UNIQUE NOT NULL, -- goodsCode
     title VARCHAR(500) NOT NULL,
-    subtitle VARCHAR(500),
     venue VARCHAR(300),
     location VARCHAR(50),
     address VARCHAR(500),

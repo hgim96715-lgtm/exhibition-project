@@ -9,7 +9,6 @@ import requests
 class Exhibition:
     exhibition_id:str
     title:str
-    subtitle:str=None
     venue:str=None
     location:str=None
     address:str=None
@@ -46,6 +45,7 @@ class InterparkCrawler:
     SUMMARY_API_URL = "https://api-ticketfront.interpark.com/v1/goods/{goods_code}/summary"
     PRICE_API_URL   = "https://api-ticketfront.interpark.com/v1/goods/{goods_code}/prices/group"
     PLACE_API_URL ="https://api-ticketfront.interpark.com/v1/Place/{place_code}"
+    STATS_API_URL   = "https://api-ticketfront.interpark.com/v1/statistics/booking"
     
        
     LOCATION_MAP = {
@@ -209,7 +209,6 @@ class InterparkCrawler:
                         "exhibition_id": str(goods_code),
                         "title":item.get("goodsName",""),
                         "venue":item.get("venueName",""),
-                        "subtitle":item.get("subGoodsName",""),
                         "location": item.get("regionName") or None, # 이건 place_code로 장소 API에서 다시 뽑아야할듯
                         "image_url": image_url,
                         "detail_url": f"{self.BASE_URL}/contents/{goods_code}",
@@ -398,16 +397,60 @@ class InterparkCrawler:
         except Exception as e:
             print(f"가격 API 파싱 오류 {e}- goods_code:{goods_code}")
             return None,[]
+        
+    def get_stats(self,goods_code:str,place_code:str="")->dict|None:
+        params={
+            "goodsCode":goods_code,
+            "placeCode":place_code,
+            "types":"ALL",
+        }
+        try:
+            resp=self.session.get(self.STATS_API_URL,params=params,timeout=10)
+            resp.raise_for_status()
+            raw=resp.json()
+            
+            if raw.get("common",{}).get("message")!="success":
+                return None
+            
+            d=raw.get("data",{})
+            if not d:
+                return None
+            
+            if isinstance(d,str):
+                d=json.loads(d)
+            
+            age_gender=d.get("ageGender",{})
+            
+            def get_rate(key:str)->float|None:
+                val=age_gender.get(key)
+                return self._safe_float(val)
+            
+            return {
+                "exhibition_id": goods_code,
+                "age10_rate":  self._safe_float(age_gender.get("age10Rate")),
+                "age20_rate": self._safe_float(age_gender.get("age20Rate")),
+                "age30_rate": self._safe_float(age_gender.get("age30Rate")),
+                "age40_rate": self._safe_float(age_gender.get("age40Rate")),
+                "age50_rate": self._safe_float(age_gender.get("age50Rate")),
+                "male_rate":self._safe_float(age_gender.get("maleRate")),
+                "female_rate":self._safe_float(age_gender.get("femaleRate")),
+                "stats_raw":json.dumps(d,ensure_ascii=False),
+            }
+        except requests.RequestException as e:
+            print(f"통계 API 요청 실패 {e}- goods_code:{goods_code}")
+            return None
+        except Exception as e:
+            print(f"통계 API 파싱 오류 {e}- goods_code:{goods_code}")
+            return None
     
-    def get_exhibition_detail(self,info:dict)->tuple["Exhibition|None",list[dict]]:
+    def get_exhibition_detail(self,info:dict)->tuple["Exhibition|None",list[dict],dict|None]:
         goods_code=info.get("exhibition_id","")
         if not goods_code:
-            return None,[]
+            return None,[],None
         
         ex =Exhibition(
             exhibition_id=goods_code,
             title=info.get("title",""),
-            subtitle=info.get("subtitle",""),
             venue=info.get("venue",""),
             location=info.get("location"),
             image_url=info.get("image_url"),
@@ -455,6 +498,9 @@ class InterparkCrawler:
             
         prices_raw_str,price_rows=self.get_price(goods_code)
         ex.prices_raw=prices_raw_str
+        
+        stats = self.get_stats(goods_code, place_code=place_code or "")
+        
         print(f"price_rows: {len(price_rows)}개 - {price_rows[:2]} ...")  
         
         price_preview=(
@@ -467,27 +513,30 @@ class InterparkCrawler:
             f"가격 미리보기: {price_preview}|"
             f"{ex.start_date}~{ex.end_date}|"
         )
-        return ex, price_rows
+        return ex, price_rows,stats
     
-    def crawl_all(self,max_pages:int=10)->tuple[list[Exhibition],list[dict]]:
+    def crawl_all(self,max_pages:int=10)->tuple[list[Exhibition],list[dict],list[dict]]:
         print("전체 크롤링 시작...")
         try:
             links=self.get_exhibition_list(max_pages=max_pages)
             if not links:
                 print("수집된 전시회가 없습니다.")
-                return [],[]
+                return [],[],[]
             
             print(f"\n 상세 크롤링 시작... 총 {len(links)}개")
             exhibitions=[]
             all_price_rows=[]
+            all_stats=[]
             
             for i, link in enumerate(links,1):
                 print(f"\n[{i}/{len(links)}] 크롤링 중: {link['title'][:30]}")
-                ex,price_rows=self.get_exhibition_detail(link)
+                ex,price_rows,stats=self.get_exhibition_detail(link)
                 print(f" detail=>{ex}, price_rows=>{price_rows[:2]} ...")
                 if ex:
                     exhibitions.append(ex)
                     all_price_rows.extend(price_rows)
+                    if stats:
+                        all_stats.append(stats)
                     time.sleep(self.delay)
             print(f"\n크롤링 완료: {len(exhibitions)}개 전시회, {len(all_price_rows)}개 가격 항목 수집")
             
@@ -498,9 +547,9 @@ class InterparkCrawler:
             print(f"\n 지역별:")
             for loc, cnt in sorted(locs.items(),key=lambda x:-x[1]):
                 print(f"  {loc}: {cnt}개")
-            return exhibitions, all_price_rows
+            return exhibitions, all_price_rows, all_stats
         
         except Exception as e:
             print(f"전체 크롤링 중 오류: {e}")
-            return [],[]
+            return [],[],[]
                     

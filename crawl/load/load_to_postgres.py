@@ -55,7 +55,7 @@ class PostgresLoader:
             return 0
         sql="""
         INSERT INTO raw_exhibitions(
-            exhibition_id,title,subtitle,
+            exhibition_id,title,
             venue,location,address,
             longitude,latitude,
             start_date,end_date,hours,
@@ -68,7 +68,6 @@ class PostgresLoader:
         ) VALUES %s
         ON CONFLICT (exhibition_id) DO UPDATE SET
             title=EXCLUDED.title,
-            subtitle=EXCLUDED.subtitle,
             venue=EXCLUDED.venue,
             location=EXCLUDED.location,
             address=EXCLUDED.address,
@@ -97,7 +96,6 @@ class PostgresLoader:
             (
                 ex["exhibition_id"],
                 ex.get("title"),
-                ex.get("subtitle"),
                 ex.get("venue"),
                 ex.get("location"),
                 ex.get("address"),

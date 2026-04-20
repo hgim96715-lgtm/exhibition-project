@@ -11,7 +11,7 @@ def run_pipeline(pages:int=10)->None:
     crawler=InterparkCrawler()
     loader=PostgresLoader()
     
-    exhibitions,all_price_rows=crawler.crawl_all(max_pages=pages)
+    exhibitions,all_price_rows,all_stats=crawler.crawl_all(max_pages=pages)
     
     if not exhibitions:
         print("수집된 전시 없음 -파이프라인 중단")
@@ -28,6 +28,9 @@ def run_pipeline(pages:int=10)->None:
     
     if all_price_rows:
         loader.upsert_exhibition_prices(all_price_rows)
+        
+    if all_stats:
+        loader.upsert_stats(all_stats)  
     
     loader.insert_history(ex_dicts)
     
@@ -47,6 +50,7 @@ def run_pipeline(pages:int=10)->None:
     
     print(f"총 전시 수: {stats.get('total_exhibitions', '0')}")
     print(f"총 가격 데이터 수: {stats.get('total_prices', '0')}")
+    print(f"관람객 통계:   {stats.get('stats_records', 0)}개") 
     print(f"히스토리:{stats.get('history',0)}")
     
     by_loc=stats.get("by_location",[])
@@ -89,7 +93,7 @@ def run_test() -> None:
             f"주간{link.get('week_rank')}위"
         )
     print("\n 더 상세한 크롤링 1건만\n")
-    ex,price_rows=crawler.get_exhibition_detail(links[0])
+    ex,price_rows,stats=crawler.get_exhibition_detail(links[0])
     if ex:
         for label,val in [
             ("제목",ex.title),
@@ -108,7 +112,23 @@ def run_test() -> None:
             ("장르",ex.genre),
         ]:
             print(f"{label}: {val}")
+        if stats:
+            print("\n통계 데이터:")
+            for k, v in stats.items():
+                print(f"{k}: {v}")
+
+def run_stats_test(goods_code:str)-> None:
+    print(f"\n 통계 테스트 ->{goods_code}")
+    crawler=InterparkCrawler()
+    result=crawler.get_stats(goods_code)
     
+    if result:
+        for k, v in result.items():
+            print(f"{k}:{v}")
+    else:
+        print("통계 데이터 없음")
+    
+
 
 # 가격 테스트 추가 
 def run_price_test(place_code:str)->None:
@@ -154,7 +174,7 @@ def run_place_test(place_code:str)->None:
 
 def main():
     parser= argparse.ArgumentParser(description="인터파크 전시 크롤링 및 DB 적재")
-    parser.add_argument("--mode",choices=["test","crawl","price-test","summary-test","place-test"],default="test", help="실행 모드")
+    parser.add_argument("--mode",choices=["test","crawl","price-test","summary-test","place-test","stats-test"],default="test", help="실행 모드")
     parser.add_argument("--pages",type=int,default=10,help="크롤링 페이지 수 ")
     parser.add_argument("--goods-code",type=str,default="26002980",help="가격/summary 테스트용 상품 코드")
     parser.add_argument("--place-code",type=str,default="19001136",help="장소 위도 경도 ")
@@ -171,6 +191,7 @@ def main():
         run_summary_test(args.goods_code)
     elif args.mode=="place-test":
         run_place_test(args.place_code)
-
+    elif args.mode=="stats-test":
+        run_stats_test(args.goods_code)
 if __name__=="__main__":
     main()
