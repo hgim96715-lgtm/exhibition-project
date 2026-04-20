@@ -44,7 +44,7 @@ services:
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./crawl:/opt/airflow/crawl # 크롤러 스크립트
-      - ./load:/opt/airflow/load # PostgreSQL 적재 스크립트
+      - ./crawl/load:/opt/airflow/load # PostgreSQL 적재 스크립트
       - ./dbt:/opt/airflow/dbt # dbt 프로젝트
     ports:
       - "8085:8080"
