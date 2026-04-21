@@ -153,8 +153,7 @@ class PostgresLoader:
             seat_grade,seat_grade_name,
             price_grade,price_grade_name,
             price_type_code,price_type_name,
-            sales_price,origin_price,discount_rate,
-            price_start_at,price_end_at,crawled_at
+            sales_price,origin_price,discount_rate,crawled_at
         ) VALUES %s
         ON CONFLICT (exhibition_id,seat_grade,price_grade,price_type_code) DO UPDATE SET
             seat_grade_name=EXCLUDED.seat_grade_name,
@@ -163,8 +162,6 @@ class PostgresLoader:
             sales_price=EXCLUDED.sales_price,
             origin_price=EXCLUDED.origin_price,
             discount_rate=EXCLUDED.discount_rate,
-            price_start_at=EXCLUDED.price_start_at,
-            price_end_at=EXCLUDED.price_end_at,
             crawled_at=EXCLUDED.crawled_at
         """
         now=datetime.now().isoformat()
@@ -181,8 +178,6 @@ class PostgresLoader:
                 p.get("sales_price"),
                 p.get("origin_price"),
                 p.get("discount_rate"),
-                p.get("price_start_at"),
-                p.get("price_end_at"),
                 now,
             )
             for p in prices

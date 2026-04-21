@@ -44,6 +44,8 @@ class InterparkCrawler:
     LIST_API_URL    = "https://tickets.interpark.com/contents/api/goods/genre"
     SUMMARY_API_URL = "https://api-ticketfront.interpark.com/v1/goods/{goods_code}/summary"
     PRICE_API_URL   = "https://api-ticketfront.interpark.com/v1/goods/{goods_code}/prices/group"
+    # BEST_API_URL 에  "originPrice", "discountRate" 필드를 구할 수 있다.
+    BEST_API_URL    = "https://api-ticketfront.interpark.com/v1/goods/{goods_code}/bestprices/group"
     PLACE_API_URL ="https://api-ticketfront.interpark.com/v1/Place/{place_code}"
     STATS_API_URL   = "https://api-ticketfront.interpark.com/v1/statistics/booking"
     
@@ -333,6 +335,36 @@ class InterparkCrawler:
             return None
         
     # 가격 API
+    
+    def _get_best_price_map(self,goods_code:str)->dict:
+        url=self.BEST_API_URL.format(goods_code=goods_code)
+        try:
+            resp=self.session.get(url,timeout=10)
+            resp.raise_for_status()
+            raw=resp.json()
+            
+            if raw.get("common",{}).get("message")!="success":
+                return {}
+            
+            items=raw.get("data",[])
+            if not isinstance(items,list):
+                return {}
+            
+            return {
+                item.get("priceGrade",""):{
+                    "origin_price":item.get("originPrice",0),
+                    "discount_rate":item.get("discountRate",0),
+                }
+                for item in items
+                if item.get("priceGrade")
+            }
+        except requests.RequestException as e:
+            print(f"Best 가격 API 요청 실패 {e}- goods_code:{goods_code}")
+            return {}
+        except Exception as e:
+            print(f"Best 가격 API 파싱 오류 {e}- goods_code:{goods_code}")
+            return {}
+    
     def get_price(self,goods_code:str)->tuple[str|None,list[dict]]:
         url=self.PRICE_API_URL.format(goods_code=goods_code)
         try:
@@ -351,6 +383,11 @@ class InterparkCrawler:
             if not data:
                 return None,[]
             
+            best_map=self._get_best_price_map(goods_code)
+            fallback_discount=next(
+                (v["discount_rate"] for v in best_map.values() if v["discount_rate"]>0),0
+            )
+            
             prices_raw_list=[]
             price_rows=[]
             
@@ -364,11 +401,27 @@ class InterparkCrawler:
                         if item.get("salesPrice") is None:
                             continue
                         
+                        price_grade=item.get("priceGrade","")
+                        sales_price=item.get("salesPrice",0)
+                        best=best_map.get(price_grade,{})
+                        
+                        origin_price=best.get("origin_price") or item.get("originPrice",0)
+                        discount_rate=best.get("discount_rate") or item.get("discountRate",0)
+                        
+                        if origin_price == 0 and discount_rate >0 and sales_price >0:
+                            origin_price=round(sales_price / (1 - discount_rate/100))
+                        elif origin_price ==0 and fallback_discount >0 and sales_price>0:
+                            origin_price=round(sales_price / (1 - fallback_discount/100))
+                            discount_rate=fallback_discount
+                            
+                        
                         prices_raw_list.append({
                             "name":item.get("priceGradeName"),
                             "price":item.get("salesPrice"),
                             "type":price_type_name,
                             "seat_grade":seat_grade_name,
+                            "origin_price":origin_price,
+                            "discount_rate":discount_rate,
                         })
                         
                         price_rows.append({
@@ -380,9 +433,8 @@ class InterparkCrawler:
                             "price_type_code":item.get("priceTypeCode",""),
                             "price_type_name":price_type_name,
                             "sales_price":item.get("salesPrice"),
-                            "origin_price":item.get("originPrice",0),
-                            "discount_rate":item.get("discountRate",0),
-                            "price_end_at":self._format_datetime(item.get("endDate","")),
+                            "origin_price":origin_price,
+                            "discount_rate":discount_rate,
                         })
                         
             prices_raw_str=(

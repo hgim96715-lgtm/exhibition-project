@@ -51,8 +51,6 @@ CREATE TABLE IF NOT EXISTS raw_exhibition_prices (
     sales_price INTEGER,
     origin_price INTEGER,
     discount_rate NUMERIC(5, 2),
-    price_start_at TIMESTAMP,
-    price_end_at TIMESTAMP,
     crawled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (
         exhibition_id,
