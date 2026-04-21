@@ -1,0 +1,50 @@
+version: 2
+
+# staging 모델 스키마 정의
+models:
+  - name: stg_exhibitions
+    description: "raw_exhibitions 정제 + 파생 컬럼 (제목 정제, 기간, 가격 파싱)"
+    columns:
+      - name: exhibition_id
+        tests: [unique, not_null]
+      - name: title_cleaned
+        description : "필요없는 접두어 제거한 제목"
+      - name: duration_days
+        description: "end_date - start_date (일수)"
+      - name: is_currently_on
+        description: "현재 진행 중 (is_active=TRUE AND 오늘이 기간 내)"
+      - name: is_ended
+        description: "종료 여부 (end_date < 오늘)"
+      - name: days_remaining
+        description: "종료까지 남은 일수 (종료 전시는 NULL)"
+      - name: price_min
+        description: "prices_raw 전체 최저가 (0원 제외)"
+      - name: price_max
+        description: "prices_raw 전체 최고가 (0원 제외)"
+      - name: price_option_count
+        description: "가격 항목 수 (0원 제외)"
+      - name: has_discount
+        description: "할인 티켓 보유 여부"
+
+  - name: stg_exhibition_stats
+    description: "raw_exhibition_stats 정제 — 연령/성별 비율 + 파생 컬럼"
+    columns:
+      - name: exhibition_id
+        tests: [not_null]
+      - name: top_age_group
+        description: "최다 연령대 (10대~50대)"
+      - name: gender_dominant
+        description: "여성 우세 / 남성 우세"
+    
+  - name: stg_exhibition_prices
+    description :  "raw_exhibition_prices 정제 — 0원 제외, 할인 여부/할인액 추가"
+    columns:
+      - name: exhibition_id
+        tests: [not_null]
+      - name: is_discount
+        description: "할인 티켓 여부"
+      - name: discount_amount
+        description: "origin_price - sales_price (origin_price=0 이면 NULL)"
+
+# mart 모델 스키마 정의 
+

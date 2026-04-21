@@ -1,0 +1,38 @@
+version: 2
+
+sources:
+  - name: raw
+    description: "인터파크 전시 크롤링 원본 데이터"
+    schema: public
+    tables:
+      - name: raw_exhibitions
+        description: "Summary API + Place API 원본"
+        columns:
+          - name: exhibition_id
+            tests: [unique, not_null]
+          - name: title
+            tests: [not_null]
+
+      - name: raw_exhibition_prices
+        description: "/v1/goods/{goodsCode}/prices/group 정규화"
+        columns:
+          - name: exhibition_id
+            tests: [not_null]
+          - name: sales_price
+            tests: [not_null]
+
+      - name: raw_exhibition_stats
+        description: "/v1/statistics/booking 연령/성별 통계"
+        columns:
+          - name: exhibition_id
+            tests: [not_null]
+          - name: snapshot_date
+            tests: [not_null]
+      
+      - name: raw_exhibition_history
+        description: "순위·가격 일별 스냅샷"
+        columns:
+          - name: exhibition_id
+            tests: [not_null]
+          - name: snapshot_date
+            tests: [not_null]
