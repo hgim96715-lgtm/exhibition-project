@@ -60,7 +60,7 @@ services:
           --firstname Admin \
           --lastname User \
           --role Admin \
-          --email admin@example.com || true &&
+          --email admin@example.com &&
         airflow scheduler &
         airflow webserver
       "
@@ -73,6 +73,7 @@ services:
       - "8090:8088"
     environment:
       - SUPERSET_SECRET_KEY=${SUPERSET_SECRET_KEY}
+      - SUPERSET_DATABASE_URI=postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     volumes:
       - superset_data:/app/superset_home
     networks:
@@ -100,7 +101,6 @@ services:
 volumes:
   postgres_data:
   superset_data:
-
 
 networks:
   exhibition-network:
