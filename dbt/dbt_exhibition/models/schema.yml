@@ -48,3 +48,34 @@ models:
 
 # mart 모델 스키마 정의 
 
+  - name: dim_age_gender_analysis
+    description : '전시별 연령/성별 분포'
+    columns:
+      - name: top_age_group
+        description : '해당 전시에서 가장 많은 관람객이 속한 연령대'
+      - name: gender_dominant
+        description : '해당 전시에서 관람객이 여성 우세인지 남성 우세인지 분석'
+
+  - name: dim_current_exhibitions
+    description : '현재 진행 중인 전시 목록'
+    columns:
+      - name: exhibition_id
+        tests: [unique, not_null]
+      - name: days_remaining
+        description : '종료까지 남은 일수'
+
+  - name: dim_location_analysis
+    description : '지역별 전시 분포 및 가격 통계'
+    columns:
+      - name: location
+        description : '시/도 단위 (지역정보 없는 경우 기타로 분류)'
+      - name : share_pct
+        description : '전체 대비 해당 지역 전시 비율 (%)'
+
+  - name : dim_price_analysis
+    description : '가격대별 전시 분포 및 할인 분석'
+    columns:
+      - name: price_range
+        description : '1만원 미만 / 1만~2만원 / 2만~3만원 / 3만~5만원 / 5만원 이상'
+      - name: max_discount_rate
+        description : '해당 가격대 전시의 최대 할인율'

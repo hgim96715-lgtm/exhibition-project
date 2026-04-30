@@ -53,6 +53,18 @@ class PostgresLoader:
         if not exhibitions:
             print("업데이트할 데이터가 없습니다.")  
             return 0
+        
+        # airflow 중복 방지 
+        deduped={}
+        for ex in exhibitions:
+            exhibition_id=ex.get("exhibition_id")
+            if not exhibition_id:
+                print(f"exhibition_id 누락된 데이터 건너뜀: {ex.get('title','unknown')}")
+                continue
+            deduped[exhibition_id]=ex
+        exhibitions=list(deduped.values())
+        
+        
         sql="""
         INSERT INTO raw_exhibitions(
             exhibition_id,title,
@@ -99,8 +111,8 @@ class PostgresLoader:
                 ex.get("venue"),
                 ex.get("location"),
                 ex.get("address"),
-                ex.get("latitude"),
                 ex.get("longitude"),
+                ex.get("latitude"),
                 ex.get("start_date"),
                 ex.get("end_date"),
                 ex.get("hours"),
@@ -146,6 +158,24 @@ class PostgresLoader:
         if not prices:
             print("업데이트할 가격 데이터가 없습니다.")
             return 0
+        deduped={}
+        for p in prices:
+            exhibition_id=p.get("exhibition_id")
+            if not exhibition_id:
+                continue
+            
+            key=(
+                exhibition_id,
+                p.get("seat_grade"),
+                p.get("price_grade"),
+                p.get("price_type_code")
+            )
+            deduped[key]=p
+        original_count=len(prices)
+        prices=list(deduped.values())
+        
+        if original_count != len(prices):
+            print(f"가격 데이터 중복 제거: 원본 {original_count}건 -> 중복 제거 후 {len(prices)}건")
         
         sql="""
         INSERT INTO raw_exhibition_prices(
@@ -205,6 +235,22 @@ class PostgresLoader:
         if not stats_list:
             print("업데이트 할 통계 데이터가 없습니다.")
             return 0
+        now=datetime.now().isoformat()
+        today=datetime.now().date().isoformat()
+        deduped={}
+        
+        for s in stats_list:
+            exhibition_id=s.get("exhibition_id")
+            if not exhibition_id:
+                continue
+            
+            key=(exhibition_id,today)
+            deduped[key]=s
+        original_count=len(stats_list)
+        stats_list=list(deduped.values())
+        
+        if original_count != len(stats_list):
+            print(f"통계 데이터 중복 제거: 원본 {original_count}건 -> 중복 제거 후 {len(stats_list)}건")
         
         sql="""
         INSERT INTO raw_exhibition_stats(
@@ -226,8 +272,6 @@ class PostgresLoader:
         crawled_at=EXCLUDED.crawled_at
         """
         
-        now=datetime.now().isoformat()
-        today=datetime.now().date().isoformat()
         
         values=[
             (
@@ -267,6 +311,23 @@ class PostgresLoader:
         if not exhibitions:
             print("적재할 히스토리 snapshot 데이터가 없습니다.")
             return 0
+                
+        now=datetime.now().isoformat()
+        today=datetime.now().date().isoformat()
+        
+        deduped={}
+        for ex in exhibitions:
+            exhibition_id=ex.get("exhibition_id")
+            if not exhibition_id:
+                continue
+            key=(exhibition_id,today)
+            deduped[key]=ex
+        original_count=len(exhibitions)
+        exhibitions=list(deduped.values())
+        
+        if original_count != len(exhibitions):
+            print(f"히스토리 snapshot 데이터 중복 제거: 원본 {original_count}건 -> 중복 제거 후 {len(exhibitions)}건")
+     
         
         sql="""
         INSERT INTO raw_exhibition_history(
@@ -282,9 +343,7 @@ class PostgresLoader:
             prices_raw=EXCLUDED.prices_raw,
             crawled_at=EXCLUDED.crawled_at
         """
-        
-        now=datetime.now().isoformat()
-        today=datetime.now().date().isoformat()
+
         
         values=[
             (

@@ -22,6 +22,9 @@ staged AS(
         COALESCE(age40_rate,0) AS age40_rate,
         COALESCE(age50_rate,0) AS age50_rate,
 
+        male_rate,
+        female_rate,
+
         {{ get_top_category({
             "남성": "male_rate",
             "여성": "female_rate"
