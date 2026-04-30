@@ -5,3 +5,7 @@ __pycache__/
 venv/
 .DS_Store
 *.log
+
+.user.yml
+CURRENT_DATE
+
